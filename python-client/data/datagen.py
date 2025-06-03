@@ -32,10 +32,9 @@ import numpy as np
 
 def main():
     i = 1
-    items_removed = 0
     json_file = 'SampleData.json'
-    fh = open(json_file, 'a')
-    avail = {}
+    fh = open(json_file, 'w')
+    available_items = []
 
     while i <= 1000:
         data = {}
@@ -65,40 +64,29 @@ def main():
             latlong = storeDetails[data['storeid']]
             data['latlong'] = latlong
 
-            # Mark the item as available for checkout
-            #item = data['scanid']
-            avail['item'] = 1
-            avail['scanid'] = data['scanid']
+            available_items.append({
+                'scanid': data['scanid'],
+                'upc': data['upc'],
+                'hub_device_id': data['hub_device_id'],
+                'storeid': data['storeid'],
+                'latlong': data['latlong']
+            })
             print "Entry placed on the shelf = [%s, %s, %s, %s]" % (data['scanid'], data['upc'], data['hub_device_id'], data['storeid'])
-        else:
-            fr = open(json_file, 'r')
-            items_removed += 1
-            num = sum(1 for line in fr)
-            if num <= 0:    # File is empty
-                continue
-            else:
-                fr.seek(0, 0)
-                for line in fr:
-                    entry = json.loads(line)
-                    # Check if the item is available for checkout
-                    item = entry['scanid']
-                    #print "Seeked Line: %s" % (entry['scanid'])
-                    if (avail['item'] == 1 and avail['scanid'] == item):  # Available for check out
-                        probability = random.random()
-                        if probability >= 0.5:  # Flip a coin to decide if this item should be removed
-                            avail['item'] = 0
-                            avail['scanid'] = item
-                            data['upc'] = entry['upc']
-                            data['hub_device_id'] = entry['hub_device_id']
-                            data['storeid'] = entry['storeid']
-                            latlong =  entry['latlong']
-                            data['latlong'] = latlong
-                            data['scanid'] = item # Match the Scand Id to Placed Scan Id
-                            data['timestamp'] = ds.isoformat("T") + "Z"
-                            print "Entry removed from shelf = [%s, %s, %s, %s]" % (
-                            data['scanid'], data['upc'], data['hub_device_id'], data['storeid'])
-                            break
-            fr.close()
+        else:  # event == 'Removed'
+            if available_items:
+                chosen_item = random.choice(available_items)
+                available_items.remove(chosen_item)
+                data['upc'] = chosen_item['upc']
+                data['hub_device_id'] = chosen_item['hub_device_id']
+                data['storeid'] = chosen_item['storeid']
+                data['latlong'] = chosen_item['latlong']
+                data['scanid'] = chosen_item['scanid']  # Match the Scand Id to Placed Scan Id
+                data['timestamp'] = ds.isoformat("T") + "Z"
+                print "Entry removed from shelf = [%s, %s, %s, %s]" % (
+                    data['scanid'], data['upc'], data['hub_device_id'], data['storeid'])
+            # If available_items is empty, data['upc'] won't be set,
+            # so the event won't be written, and i won't be incremented.
+
         #print "Writing data to the file = [%s, %s ]" % ( data['scanid'], data['event'])
         key = 'upc'
         if key in data:
